@@ -2,6 +2,8 @@ const getState = ({ getStore, getActions, setStore }) => {
 	return {
 		store: {
 			message: null,
+			token: null,
+			section: null,
 			demo: [
 				{
 					title: "FIRST",
@@ -46,6 +48,61 @@ const getState = ({ getStore, getActions, setStore }) => {
 
 				//reset the global store
 				setStore({ demo: demo });
+			},
+			syncTokenFromSessionStorage: () => {
+				const token = sessionStorage.getItem('token')
+				if (token && token != '' && token != undefined ) setStore({ token : token})
+			},
+			logout: () => {
+				sessionStorage.removeItem('token')
+				setStore({ token : null, section: 'logout', message: null})
+
+			},
+			privateArea: async () => {
+				try{
+					const store = getStore();
+					let requestOptions = {
+						headers: { 'Authorization': 'Bearer '+store.token }
+					};
+					const resp = await fetch(process.env.BACKEND_URL + "/api/private", requestOptions)
+					const data = await resp.json()
+					if (resp.status == 401) {
+						getActions().logout()
+					}
+					setStore({ message: data.message, section: data.section })
+					// don't forget to return something, that is how the async resolves
+					return data;
+				}catch(error){
+					console.log("Error loading message from backend", error)
+				}
+			},
+			login: async (email, password) => {
+				try{
+
+					let requestOptions = {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body : JSON.stringify({
+							'email': email,
+							'password': password
+						})
+					};
+
+					const resp = await fetch(process.env.BACKEND_URL+"/api/token", requestOptions)
+					
+					if (resp.status !== 200) {
+						alert("There has been some error")
+						return false;
+					}
+
+					const data = await resp.json()
+					sessionStorage.setItem("token", data.access_token)
+					setStore({ token : data.access_token})
+					return true
+
+				} catch (error) {
+					console.error('There has been an error log in')
+				}
 			}
 		}
 	};
